@@ -31,4 +31,7 @@ export { ProSearchRender } from "./pro-search-render"
 export { ImageSection, ImageSectionSkeleton } from "./image-section"
 export { AssistantMessageContent, ErrorMessage } from "./assistant-message"
 export { UserMessageContent } from "./user-message"
+export { ModelLogo } from "./model-logo"
+export { ModelCard, ModelCardGrid } from "./model-card"
+export { ModelShowcase } from "./model-showcase"
 

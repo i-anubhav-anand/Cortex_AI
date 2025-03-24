@@ -1,53 +1,54 @@
 "use client"
 
+import { useCallback, useState, useEffect } from "react"
+import { Switch } from "@/components/ui/switch"
+import { useConfigStore } from "@/stores"
 import { cn } from "@/lib/utils"
-import { useConfigStore } from "../stores"
-import { Switch } from "./ui/switch"
 
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
-import { Separator } from "./ui/separator"
-import { env } from "@/env"
-
-const ProToggle = () => {
-  const { proMode, toggleProMode } = useConfigStore()
-
-  return (
-    <HoverCard>
-      <HoverCardTrigger
-        asChild
-        className={cn("hover:cursor-pointer", !env.NEXT_PUBLIC_LOCAL_MODE_ENABLED && "hover:cursor-not-allowed")}
-      >
-        <div className="group flex space-x-2 items-center justify-end pr-3 hover:text-primary">
-          <Switch disabled={!env.NEXT_PUBLIC_PRO_MODE_ENABLED} checked={proMode} onCheckedChange={toggleProMode} />
-          <span
-            className={cn(
-              "font-medium text-sm transition-all",
-              proMode ? "text-tint " : "text-gray-500 group-hover:text-primary",
-            )}
-          >
-            Expert
-          </span>
-        </div>
-      </HoverCardTrigger>
-      <HoverCardContent className="w-80 p-3">
-        <div className="flex flex-col items-start rounded-md ">
-          <div className="text-lg font-medium ">
-            <span className="text-tint">Expert </span>
-            <span>Mode</span>
-          </div>
-          <div className="text-sm gap-y-1 flex flex-col ">
-            <div>Expert mode will create a plan to answer your question to make the answer more accurate.</div>
-          </div>
-          <Separator className="mt-1" />
-          <div className="text-xs text-muted-foreground mt-2">
-            <span>Requires self-hosted setup. </span>
-            <span className="text-primary">Learn more</span>
-          </div>
-        </div>
-      </HoverCardContent>
-    </HoverCard>
-  )
+// Inline useIsClient hook to avoid import issues
+function useIsClient() {
+  const [isClient, setIsClient] = useState(false)
+  
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+  
+  return isClient
 }
 
-export default ProToggle
+export function ProToggle({ className }: { className?: string }) {
+  const { proMode, toggleProMode } = useConfigStore()
+  const isClient = useIsClient()
+
+  const handleToggle = useCallback(() => {
+    console.log("Toggle Expert mode from:", proMode, "to:", !proMode);
+    toggleProMode()
+  }, [proMode, toggleProMode])
+
+  if (!isClient) {
+    // Server-side or during hydration, return a placeholder
+    return (
+      <div className="flex items-center space-x-2">
+        <div className="text-sm font-medium mr-1">Expert</div>
+        <div className="w-9 h-5 rounded-full bg-gray-200" />
+      </div>
+    )
+  }
+
+  // Return a simplified toggle to match the UI in the screenshot
+  return (
+    <div className="flex items-center space-x-2">
+      <div className="text-sm font-medium mr-1">Expert</div>
+      <Switch
+        id="expert-mode"
+        checked={proMode}
+        onCheckedChange={handleToggle}
+        className={cn(
+          "data-[state=checked]:bg-purple-600",
+          proMode ? "bg-purple-600" : "bg-gray-200" 
+        )}
+      />
+    </div>
+  )
+}
 

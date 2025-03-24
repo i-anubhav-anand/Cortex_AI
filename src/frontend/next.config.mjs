@@ -36,7 +36,15 @@ const nextConfig = {
       },
       {
         source: '/api/chat',
-        destination: 'http://localhost:8000/chat',
+        destination: 'http://44.222.190.191:8000/chat',
+      },
+      {
+        source: '/api/history',
+        destination: 'http://44.222.190.191:8000/history',
+      },
+      {
+        source: '/api/:path*',
+        destination: 'http://44.222.190.191:8000/:path*',
       },
     ]
   },

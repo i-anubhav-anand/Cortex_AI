@@ -1,9 +1,17 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { ChatModel } from "../../generated/types.gen"
+import { getApiUrl as getApiUrlFromUtil } from "./api-url"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+// Helper function to create API URLs that work with Next.js API routes
+export function getApiUrl(endpoint: string): string {
+  return getApiUrlFromUtil(endpoint, { 
+    forStreaming: endpoint === 'chat' && typeof window !== 'undefined'
+  });
 }
 
 export function isLocalModel(model: ChatModel) {

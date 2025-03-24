@@ -6,7 +6,7 @@ import TextareaAutosize from "react-textarea-autosize"
 import { useState } from "react"
 import { Button } from "./ui/button"
 import { ArrowUp, Paperclip } from "lucide-react"
-import ProToggle from "./pro-toggle"
+import { ProToggle } from "./pro-toggle"
 import { ModelSelection } from "./model-selection"
 
 const InputBar = ({
@@ -37,7 +37,7 @@ const InputBar = ({
           </Button>
           <ModelSelection />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <ProToggle />
           <Button
             type="submit"
@@ -75,7 +75,7 @@ const FollowingUpInput = ({
           aria-label="Ask a question"
         />
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <ProToggle />
         <Button
           type="submit"

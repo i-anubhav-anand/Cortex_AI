@@ -52,10 +52,18 @@ const useStore = create<StoreState>()(
           const newModel = newLocalMode ? ChatModel.LLAMA3 : ChatModel.GPT_4O_MINI
           return { ...state, localMode: newLocalMode, model: newModel }
         }),
-      toggleProMode: () => set((state) => ({ proMode: !state.proMode })),
+      toggleProMode: () => set((state) => {
+        console.log("Store: Toggling proMode from", state.proMode, "to", !state.proMode);
+        return { proMode: !state.proMode };
+      }),
     }),
     {
       name: "chat-store",
+      partialize: (state) => ({
+        model: state.model,
+        localMode: state.localMode,
+        proMode: state.proMode,
+      }),
     },
   ),
 )

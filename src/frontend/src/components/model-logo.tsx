@@ -13,7 +13,15 @@ interface ModelLogoProps {
 
 export function ModelLogo({ model, size = 24, className = "" }: ModelLogoProps) {
   const { theme } = useTheme()
-  const isDark = theme === "dark"
+  const [mounted, setMounted] = useState(false)
+  
+  // Ensure we only use client-side theme after mounting to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+  
+  // Default to dark theme for server-side rendering to ensure consistency
+  const isDark = mounted ? theme === "dark" : true
   
   // Get the appropriate logo based on model type
   const getLogoSrc = () => {
@@ -24,8 +32,8 @@ export function ModelLogo({ model, size = 24, className = "" }: ModelLogoProps) 
         return "/llama.webp";
       case ChatModel.GPT_4O:
       case ChatModel.GPT_4O_MINI:
-        // Use green logo for dark mode, regular logo for light mode
-        return isDark ? "/ChatGPT-Logo-PNG-Green-Color-Design-1.png" : "/ChatGPT-Logo.svg.png";
+        // Always use the green logo version for consistency between client and server
+        return "/ChatGPT-Logo-PNG-Green-Color-Design-1.png";
       case ChatModel.PHI3_14B:
         return "/phi3.png";
       case ChatModel.GEMMA:
@@ -38,7 +46,7 @@ export function ModelLogo({ model, size = 24, className = "" }: ModelLogoProps) 
         return "/setting.png";
       default:
         // Fallback to existing logos
-        return isDark ? "/logo-white.png" : "/logo-black.png";
+        return "/logo-white.png";
     }
   }
   

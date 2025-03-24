@@ -19,6 +19,7 @@ import { ChatModel } from "../types/models" // Use local enum
 import { isCloudModel, isLocalModel } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ModelLogo } from "./model-logo"
+import { useEffect, useState } from "react"
 
 import _ from "lodash"
 import { env } from "@/env"
@@ -103,11 +104,16 @@ const cloudModelMap: Partial<Record<ChatModel, Model>> = _.pickBy(modelMap, (_, 
 
 const ModelItem: React.FC<{ model: Model }> = ({ model }) => {
   const modelType = model.value as ChatModel;
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-  let logoSrc = "";
+  const [mounted, setMounted] = useState(false);
+  
+  // Prevent hydration mismatch by using consistent images
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   // Choose logo based on model type
+  let logoSrc = "";
+  
   switch(modelType) {
     case ChatModel.LLAMA3:
     case ChatModel.LLAMA_3_70B:
@@ -115,7 +121,8 @@ const ModelItem: React.FC<{ model: Model }> = ({ model }) => {
       break;
     case ChatModel.GPT_4O:
     case ChatModel.GPT_4O_MINI:
-      logoSrc = isDark ? "/ChatGPT-Logo-PNG-Green-Color-Design-1.png" : "/ChatGPT-Logo.svg.png";
+      // Always use the same image to prevent hydration mismatch
+      logoSrc = "/ChatGPT-Logo-PNG-Green-Color-Design-1.png";
       break;
     case ChatModel.PHI3_14B:
       logoSrc = "/phi3.png";
@@ -133,7 +140,7 @@ const ModelItem: React.FC<{ model: Model }> = ({ model }) => {
       logoSrc = "/setting.png";
       break;
     default:
-      logoSrc = isDark ? "/logo-white.png" : "/logo-black.png";
+      logoSrc = "/logo-white.png";
   }
   
   return (
@@ -161,9 +168,13 @@ const ModelItem: React.FC<{ model: Model }> = ({ model }) => {
 
 export function ModelSelection() {
   const { localMode, model, setModel, toggleLocalMode } = useConfigStore()
+  const [mounted, setMounted] = useState(false);
   const selectedModel = modelMap[model as ChatModel] ?? modelMap[ChatModel.GPT_4O_MINI]
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
+  
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   // Get logo for the selected model
   let logoSrc = "";
@@ -174,7 +185,8 @@ export function ModelSelection() {
       break;
     case ChatModel.GPT_4O:
     case ChatModel.GPT_4O_MINI:
-      logoSrc = isDark ? "/ChatGPT-Logo-PNG-Green-Color-Design-1.png" : "/ChatGPT-Logo.svg.png";
+      // Always use the same image to prevent hydration mismatch
+      logoSrc = "/ChatGPT-Logo-PNG-Green-Color-Design-1.png";
       break;
     case ChatModel.PHI3_14B:
       logoSrc = "/phi3.png";
@@ -192,7 +204,7 @@ export function ModelSelection() {
       logoSrc = "/setting.png";
       break;
     default:
-      logoSrc = isDark ? "/logo-white.png" : "/logo-black.png";
+      logoSrc = "/logo-white.png";
   }
 
   return (
@@ -236,7 +248,7 @@ export function ModelSelection() {
           <TabsList className="w-full">
             <TabsTrigger value="cloud" className="flex-1">
               <div className="flex items-center gap-1">
-                <img src={isDark ? "/ChatGPT-Logo-PNG-Green-Color-Design-1.png" : "/ChatGPT-Logo.svg.png"} alt="Cloud" className="w-5 h-5 rounded-full object-cover" />
+                <img src="/ChatGPT-Logo-PNG-Green-Color-Design-1.png" alt="Cloud" className="w-5 h-5 rounded-full object-cover" />
                 Cloud
               </div>
             </TabsTrigger>

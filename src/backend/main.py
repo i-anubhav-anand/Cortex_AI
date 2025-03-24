@@ -75,10 +75,14 @@ def configure_rate_limiting(
 def configure_middleware(app: FastAPI):
     app.add_middleware(
         CORSMiddleware,
+        # Allow all origins to simplify debugging 
+        # (You can restrict this later for production)
         allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["Content-Type", "Content-Length"],
+        max_age=3600,
     )
 
 

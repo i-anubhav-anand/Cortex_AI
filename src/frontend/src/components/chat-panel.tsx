@@ -11,12 +11,16 @@ import MessagesList from "./messages-list"
 import { StarterQuestionsList } from "./starter-questions"
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert"
 import { Button } from "./ui/button"
+import { useConfigOverrides } from "@/lib/config-overrides"
 
 // Memoize the component to prevent unnecessary re-renders
 const ChatPanel = memo(({ threadId }: { threadId?: number }) => {
   const searchParams = useSearchParams()
   const queryMessage = searchParams.get("q")
   const hasRun = useRef(false)
+  
+  // Apply configuration overrides (enables Expert mode by default)
+  useConfigOverrides()
 
   const { handleSend, streamingMessage, isStreamingMessage, isStreamingProSearch } = useChat()
   const { messages, setMessages, setThreadId } = useChatStore()
@@ -24,7 +28,12 @@ const ChatPanel = memo(({ threadId }: { threadId?: number }) => {
 
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
+  // Default to not auto-scrolling so content stays at the top
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(false)
+  // Track the scroll position for maintaining view
+  const [scrollPosition, setScrollPosition] = useState(0)
+  // Track content height to maintain relative position
+  const [prevContentHeight, setPrevContentHeight] = useState(0)
 
   // Handle initial query from URL if present
   useEffect(() => {
@@ -52,32 +61,59 @@ const ChatPanel = memo(({ threadId }: { threadId?: number }) => {
     }
   }, [messages, threadId, setThreadId])
 
-  // Detect user scroll to disable auto-scrolling
+  // Detect user scroll to manage manual scrolling
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
     const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container
-      // If user scrolls up more than 100px from bottom, disable auto-scroll
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
-      setShouldAutoScroll(isNearBottom)
+      // Store current scroll position
+      const { scrollTop } = container;
+      setScrollPosition(scrollTop);
+      
+      // Only enable auto-scroll if user scrolls to bottom
+      const { scrollHeight, clientHeight } = container
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 20
+      setShouldAutoScroll(isAtBottom)
     }
 
     container.addEventListener("scroll", handleScroll)
     return () => container.removeEventListener("scroll", handleScroll)
   }, [])
 
-  // Auto-scroll to bottom when new messages arrive (if shouldAutoScroll is true)
+  // Maintain scroll position when content changes
   useEffect(() => {
-    if (shouldAutoScroll && containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight
+    const container = containerRef.current
+    if (!container) return
+    
+    // Get current content height
+    const { scrollHeight } = container
+    
+    // If we have previous content height and we're not at bottom
+    if (prevContentHeight > 0 && !shouldAutoScroll) {
+      // Calculate how much content was added
+      const contentDiff = scrollHeight - prevContentHeight
+      
+      // Adjust scroll position to maintain view
+      if (contentDiff > 0) {
+        container.scrollTop = scrollPosition
+      }
     }
-  }, [messages, streamingMessage, shouldAutoScroll])
+    
+    // Only auto-scroll if it's explicitly enabled by the user
+    if (shouldAutoScroll) {
+      container.scrollTop = container.scrollHeight
+    }
+    
+    // Update height for next comparison
+    setPrevContentHeight(scrollHeight)
+  }, [messages, streamingMessage, shouldAutoScroll, scrollPosition, prevContentHeight])
 
   // Focus input when component mounts
   useEffect(() => {
-    inputRef.current?.focus()
+    if (inputRef.current) {
+      inputRef.current.focus()
+    }
   }, [])
 
   // Show loading state while fetching thread data
@@ -115,10 +151,10 @@ const ChatPanel = memo(({ threadId }: { threadId?: number }) => {
           {/* Scrollable messages container */}
           <div
             ref={containerRef}
-            className="flex-1 overflow-y-auto pt-16 pb-24"
+            className="flex-1 overflow-y-auto pt-16 pb-24 custom-scrollbar scroll-container"
             style={{ height: "calc(100vh - 4rem)" }} // Ensure enough space for scrolling
           >
-            <div className="max-w-3xl mx-auto px-4">
+            <div className="max-w-3xl mx-auto px-4 messages-container">
               <MessagesList
                 messages={messages}
                 streamingMessage={streamingMessage}
@@ -136,9 +172,9 @@ const ChatPanel = memo(({ threadId }: { threadId?: number }) => {
                 isFollowingUp
                 sendMessage={(message) => {
                   handleSend(message)
-                  setShouldAutoScroll(true) // Re-enable auto-scroll when sending a message
+                  // Don't enable auto-scroll by default to maintain position
                 }}
-                inputRef={inputRef}
+                inputRef={inputRef as React.RefObject<HTMLTextAreaElement>}
               />
             </div>
           </div>
@@ -149,7 +185,10 @@ const ChatPanel = memo(({ threadId }: { threadId?: number }) => {
           <div className="flex flex-col items-center justify-center mb-8">
             <h1 className="text-4xl font-bold mb-6">What do you want to know?</h1>
             <div className="w-full max-w-xl">
-              <AskInput sendMessage={handleSend} inputRef={inputRef} />
+              <AskInput 
+                sendMessage={handleSend} 
+                inputRef={inputRef as React.RefObject<HTMLTextAreaElement>} 
+              />
             </div>
           </div>
           <div className="w-full max-w-xl">

@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query"
 import { env } from "@/env"
+import { getApiUrl } from "@/lib/utils"
 import type { ThreadResponse } from "../../generated/types.gen"
+import { getApiBaseUrl } from "@/lib/api-url"
 
 const BASE_URL = env.NEXT_PUBLIC_API_URL
 
@@ -51,8 +53,10 @@ const fetchChatThread = async (threadId: number): Promise<ThreadResponse> => {
 
   // Try with fetch first
   try {
-    console.log(`Fetching thread ${threadId} from ${BASE_URL}/thread/${threadId}`)
-    const response = await fetchWithTimeout(`${BASE_URL}/thread/${threadId}`, {
+    const apiUrl = getApiUrl(`thread/${threadId}`)
+    console.log(`Fetching thread ${threadId} from ${apiUrl}`)
+    
+    const response = await fetchWithTimeout(apiUrl, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -122,7 +126,7 @@ const fetchChatThread = async (threadId: number): Promise<ThreadResponse> => {
       }
 
       // Open and send request
-      xhr.open("GET", `${BASE_URL}/thread/${threadId}`, true)
+      xhr.open("GET", getApiUrl(`thread/${threadId}`), true)
       xhr.timeout = 15000 // 15 seconds timeout
 
       // Set headers

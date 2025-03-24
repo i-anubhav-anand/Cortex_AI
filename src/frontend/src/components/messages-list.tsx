@@ -25,42 +25,52 @@ const MessagesList = memo(
     }
 
     return (
-      <div className="flex flex-col w-full">
+      <div className="flex flex-col w-full messages-container custom-scrollbar scroll-container">
         {messages.map((message, index) => {
           if (!message) {
             console.warn("Null message at index", index)
             return null
           }
 
-          const key = `message-${index}-${message.role}`
-
-          return message.role === MessageRole.USER ? (
-            <UserMessageContent key={key} message={message} />
-          ) : (
-            <div key={key} className="mb-8">
-              {/* Always display agent_response (Expert Search) if available */}
-              {message.agent_response && <ProSearchRender streamingProResponse={message.agent_response} />}
-              <AssistantMessageContent message={message} onRelatedQuestionSelect={onRelatedQuestionSelect} />
-              {index !== messages.length - 1 && <Separator className="mt-8" />}
+          const isLast = index === messages.length - 1
+          const messageContent = (
+            <div key={`message-${index}-${message.role}`} className="message-item">
+              {message.role === MessageRole.USER ? (
+                <UserMessageContent message={message} />
+              ) : (
+                <AssistantMessageContent 
+                  message={message} 
+                  onRelatedQuestionSelect={onRelatedQuestionSelect}
+                />
+              )}
+              {!isLast && <Separator className="my-6" />}
             </div>
           )
+
+          return messageContent
         })}
 
-        {/* Show pro search while streaming */}
-        {isStreamingProSearch && streamingMessage && streamingMessage.agent_response && (
-          <ProSearchRender
-            streamingProResponse={streamingMessage.agent_response}
-            isStreamingProSearch={isStreamingProSearch}
-          />
-        )}
-
-        {/* Show streaming message */}
-        {streamingMessage && isStreamingMessage && (
-          <AssistantMessageContent
-            message={streamingMessage}
-            isStreaming={true}
-            onRelatedQuestionSelect={onRelatedQuestionSelect}
-          />
+        {isStreamingMessage && streamingMessage && (
+          <div key="streaming" className="message-item">
+            {streamingMessage.role === MessageRole.USER ? (
+              <UserMessageContent message={streamingMessage} />
+            ) : (
+              <>
+                {isStreamingProSearch && streamingMessage.agent_response ? (
+                  <ProSearchRender 
+                    streamingProResponse={streamingMessage.agent_response} 
+                    isStreamingProSearch={isStreamingProSearch}
+                  />
+                ) : (
+                  <AssistantMessageContent 
+                    message={streamingMessage} 
+                    isStreaming={true}
+                    onRelatedQuestionSelect={onRelatedQuestionSelect}
+                  />
+                )}
+              </>
+            )}
+          </div>
         )}
       </div>
     )

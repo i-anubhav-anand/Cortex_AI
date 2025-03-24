@@ -21,8 +21,11 @@ import {
 import { useState, useRef, useCallback, useEffect } from "react"
 import { useConfigStore, useChatStore } from "@/stores"
 import { env } from "@/env"
+import { getApiUrl } from "@/lib/utils"
+import { getApiBaseUrl, getApiUrl as getApiUrlFromUtils } from "@/lib/api-url"
 
-const BASE_URL = env.NEXT_PUBLIC_API_URL
+// For all API requests, use Next.js API routes to avoid CORS issues
+const CHAT_API_URL = "/api/chat"
 
 // Increased timeout duration (2 minutes)
 const REQUEST_TIMEOUT = 120000
@@ -74,7 +77,23 @@ export const useChat = () => {
   const handleEvent = useCallback(
     (eventData: string) => {
       try {
-        const eventItem: ChatResponseEvent = JSON.parse(eventData)
+        // Sanitize the input data before parsing
+        // This helps with potentially malformed JSON coming from the server
+        const sanitizedData = eventData.trim();
+        
+        // Skip empty data chunks
+        if (!sanitizedData) return;
+        
+        // Try to parse the JSON with additional error handling
+        let eventItem: ChatResponseEvent;
+        try {
+          eventItem = JSON.parse(sanitizedData);
+        } catch (parseError) {
+          console.error("Error parsing event data:", parseError);
+          console.log("Problematic data:", sanitizedData.substring(0, 100) + (sanitizedData.length > 100 ? "..." : ""));
+          return; // Skip this event if it can't be parsed
+        }
+        
         const state = stateRef.current
 
         switch (eventItem.event) {
@@ -261,18 +280,61 @@ export const useChat = () => {
   // Function to process SSE data
   const processSSE = useCallback(
     (data: string) => {
-      const lines = data.split("\n")
-      for (const line of lines) {
-        if (line.trim() === "") continue
-        if (line.startsWith("data: ")) {
-          const jsonData = line.slice(6) // Remove "data: " prefix
-          if (jsonData.trim()) {
-            handleEvent(jsonData)
+      try {
+        // Check if we have a complete data set
+        if (!data.includes("data: ")) {
+          console.log("Incomplete SSE data received, waiting for more...");
+          return;
+        }
+        
+        // Split by newlines and process each line
+        const lines = data.split("\n");
+        
+        // Keep track of current event data
+        let currentEvent = "";
+        
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          
+          // Skip empty lines
+          if (trimmedLine === "") continue;
+          
+          // If we find a new data line, process any accumulated event data
+          if (trimmedLine.startsWith("data: ")) {
+            // First process any previous event data
+            if (currentEvent) {
+              handleEvent(currentEvent);
+              currentEvent = ""; // Reset for next event
+            }
+            
+            // Extract the new data portion
+            const jsonData = trimmedLine.slice(6).trim(); // Remove "data: " prefix
+            
+            // Handle empty data lines
+            if (!jsonData) continue;
+            
+            // For simple data lines, process immediately
+            if (!jsonData.includes("\n") && !jsonData.includes("\r")) {
+              handleEvent(jsonData);
+            } else {
+              // For multi-line data, accumulate
+              currentEvent = jsonData;
+            }
+          } else if (currentEvent) {
+            // Accumulate multi-line data
+            currentEvent += "\n" + trimmedLine;
           }
         }
+        
+        // Process any remaining event data
+        if (currentEvent) {
+          handleEvent(currentEvent);
+        }
+      } catch (error) {
+        console.error("Error processing SSE data:", error);
       }
     },
-    [handleEvent],
+    [handleEvent]
   )
 
   // Function to clean up resources
@@ -331,7 +393,9 @@ export const useChat = () => {
         pro_search: proMode,
       }
 
-      console.log("Sending request to:", `${BASE_URL}/chat`)
+      // For streaming connections, we should prefer direct container networking
+      // This will route through Docker's internal network rather than going out to the internet
+      console.log("Sending request to:", CHAT_API_URL)
       console.log("Request data:", JSON.stringify(req))
 
       try {
@@ -355,8 +419,9 @@ export const useChat = () => {
               heartbeatInterval = setInterval(() => {
                 if (xhr.readyState === 3 || xhr.readyState === 4) {
                   // Connection is still active, do nothing
+                  console.log("Heartbeat: connection active, readyState:", xhr.readyState)
                 } else {
-                  console.log("Heartbeat check: connection may be stalled")
+                  console.log("Heartbeat check: connection may be stalled, readyState:", xhr.readyState)
                 }
               }, 10000) // Check every 10 seconds
             }
@@ -369,19 +434,18 @@ export const useChat = () => {
             }
 
             xhr.onreadystatechange = () => {
+              console.log("XHR state changed:", xhr.readyState, "status:", xhr.status)
+              
               if (xhr.readyState >= 3) {
                 // Get only the new data
                 const newData = xhr.responseText.substring(buffer.length)
+                console.log("New data received:", newData ? newData.length + " bytes" : "none")
+                
                 if (newData) {
                   buffer += newData
                   processSSE(newData)
                   connected = true
                   receivedData = true
-
-                  // Reset the timeout since we're receiving data
-                  if (xhr.timeout > 0) {
-                    xhr.timeout = REQUEST_TIMEOUT
-                  }
                 }
               }
 
@@ -419,22 +483,17 @@ export const useChat = () => {
               }
             }
 
-            xhr.onerror = (e) => {
+            xhr.onerror = (error) => {
+              console.error("XHR error:", error)
               stopHeartbeat()
-              console.error("XHR error:", e)
-
-              if (receivedData) {
-                // If we received some data, consider it a partial success
-                console.log("Received partial data before error, treating as partial success")
-                resolve()
-              } else if (retryCount < MAX_RETRIES) {
+              if (retryCount < MAX_RETRIES) {
                 retryCount++
                 console.log(`Retrying request after error (${retryCount}/${MAX_RETRIES})...`)
                 setTimeout(() => {
                   makeRequest().then(resolve).catch(reject)
                 }, 1000 * retryCount)
               } else {
-                reject(new Error("Network error after multiple retry attempts"))
+                reject(new Error("Request failed after multiple retry attempts"))
               }
             }
 
@@ -457,17 +516,25 @@ export const useChat = () => {
               }
             }
 
-            // Open connection
-            xhr.open("POST", `${BASE_URL}/chat`, true)
-
-            // Set headers
+            // Set debug logging
+            console.log("Making request to API:", CHAT_API_URL)
+            
+            // CRITICAL STREAMING FIX:
+            // Use Next.js API routes to handle CORS properly
+            xhr.open("POST", CHAT_API_URL, true)
+            
+            // Enable CORS credentials for streaming
+            xhr.withCredentials = true
+            
+            // Headers for proper SSE support
             xhr.setRequestHeader("Content-Type", "application/json")
             xhr.setRequestHeader("Accept", "text/event-stream")
             xhr.setRequestHeader("Cache-Control", "no-cache")
             xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest")
-
-            // Set timeout (2 minutes)
-            xhr.timeout = REQUEST_TIMEOUT
+            xhr.setRequestHeader("Connection", "keep-alive")
+            
+            // Extended timeout for streaming connections
+            xhr.timeout = REQUEST_TIMEOUT * 2
 
             // Send request
             xhr.send(JSON.stringify(req))
